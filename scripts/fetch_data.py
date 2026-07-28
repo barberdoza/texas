@@ -188,8 +188,11 @@ def build_rollup(shops):
     return rollup_out
 
 
-def write_output(shops, unknown_types, excluded_school_count, in_progress):
+def write_output(shops, unknown_types, excluded_school_count, in_progress, type_subtype_breakdown=None):
     geocoded_count = sum(1 for s in shops if s[7] is not None)
+    top_breakdown = {}
+    if type_subtype_breakdown:
+        top_breakdown = dict(sorted(type_subtype_breakdown.items(), key=lambda kv: -kv[1])[:50])
     output = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source": "Texas Department of Licensing and Regulation (TDLR) via data.texas.gov (Socrata Open Data)",
@@ -200,6 +203,7 @@ def write_output(shops, unknown_types, excluded_school_count, in_progress):
         "categories": CATEGORY_LABELS,
         "excluded_school_or_instructor_records": excluded_school_count,
         "unclassified_license_types": unknown_types,
+        "license_type_subtype_breakdown": top_breakdown,
         "geocode_coverage": {"geocoded": geocoded_count, "total": len(shops)},
         "shop_fields": ["name", "category", "subtype", "address", "city", "county", "zip", "lat", "lon"],
         "rollup": build_rollup(shops),
@@ -304,9 +308,14 @@ def main():
     excluded_school_count = 0
     geocode_inputs = []  # (row_index, street, city, state, zip)
     reused_from_cache = 0
+    type_subtype_breakdown = {}  # (license_type, license_subtype) -> count, for every row seen
 
     for row in raw:
         license_type = row.get(lt_f)
+        license_subtype = row.get(sub_f)
+        breakdown_key = f"{license_type or ''} | {license_subtype or ''}"
+        type_subtype_breakdown[breakdown_key] = type_subtype_breakdown.get(breakdown_key, 0) + 1
+
         category = classify(license_type)
         if category is None:
             excluded_school_count += 1
@@ -345,10 +354,16 @@ def main():
           f"{sum(unknown_types.values())} unclassified, "
           f"{reused_from_cache} reused from a previous run's geocoding).")
 
+    print("Real LICENSE TYPE | LICENSE SUBTYPE breakdown (top 25 by count) -- "
+          "use this to sanity-check classify() against what TDLR actually publishes:")
+    for key, count in sorted(type_subtype_breakdown.items(), key=lambda kv: -kv[1])[:25]:
+        print(f"  {count:>7}  {key}")
+
     # Checkpoint #1: commit real shop counts/rollup right away, before the
     # slow part even starts. If everything after this fails, you still have
     # accurate totals instead of nothing.
-    write_output(shops, unknown_types, excluded_school_count, in_progress=bool(geocode_inputs))
+    write_output(shops, unknown_types, excluded_school_count, in_progress=bool(geocode_inputs),
+                 type_subtype_breakdown=type_subtype_breakdown)
     git_checkpoint(f"TX data: classified {len(shops)} shops, geocoding {len(geocode_inputs)} new addresses")
 
     if geocode_inputs:
@@ -376,7 +391,8 @@ def main():
             batches_since_checkpoint += 1
             if batches_since_checkpoint >= CHECKPOINT_EVERY_N_BATCHES or batch_num == num_batches:
                 still_in_progress = batch_num < num_batches
-                write_output(shops, unknown_types, excluded_school_count, in_progress=still_in_progress)
+                write_output(shops, unknown_types, excluded_school_count, in_progress=still_in_progress,
+                             type_subtype_breakdown=type_subtype_breakdown)
                 git_checkpoint(f"TX data: geocoded {done} of {len(geocode_inputs)} new addresses "
                                 f"(batch {batch_num}/{num_batches})")
                 batches_since_checkpoint = 0

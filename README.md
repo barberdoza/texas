@@ -1,96 +1,102 @@
-# NY Shop Directory
+# TX Shop Directory
 
-A static web app showing every **active licensed barbershop** and
-**appearance enhancement business** (salons, nail, esthetics, waxing, hair
-styling) in New York State: a searchable city-level rollup, a ranking chart,
-and a full clustered map of individual shop locations.
+A static web app showing licensed **barbering and cosmetology establishments**
+in Texas: a searchable county-level rollup, a ranking chart, and a map of
+individually geocoded shop locations.
 
-Data comes straight from the New York State Department of State's public
-registry, via the state's open data portal (`data.ny.gov`, built on
-Socrata) — specifically the *"Active Appearance Enhancement and Barber
-Business and Area Renter Licensees"* dataset:
-https://data.ny.gov/Economic-Development/Active-Appearance-Enhancement-and-Barber-Business-/y3u4-jbgh
+Data comes from the Texas Department of Licensing and Regulation's
+**"TDLR - All Licenses"** dataset on `data.texas.gov` (Socrata):
+https://data.texas.gov/Permits-and-Licensing/TDLR-All-Licenses/7358-krk7
 
-**No API key needed.** Unlike the Census-based tool, NY's open data API is
-free and key-less for this volume of traffic.
+**No API key needed** for the license data. Addresses are geocoded using the
+**free U.S. Census Bureau batch geocoder** (also no key), since — unlike
+NY's registry — Texas doesn't publish coordinates directly.
 
-The repo ships with **sample placeholder data** (`data/ny_shops.json`,
+The repo ships with **sample placeholder data** (`data/tx_shops.json`,
 synthetic, clearly labeled) so the site works the moment you deploy it.
-Follow the steps below to pull the real registry data.
+
+## Why this one's a bit different from the NY app
+
+- **Texas consolidated its license types in 2024.** House Bill 1560 merged
+  Barbershop, Beauty Shop, and Dual Shop licenses into a single **"Full-
+  Service Establishment"** license. Barbershops got new license numbers
+  immediately; beauty salons keep their old number but get the new label at
+  their next renewal. So at any given moment, the live data is a **mix of
+  legacy and current labels** — this app buckets both, and shows them as
+  separate rows so you can see the transition happening over time.
+- **No pre-published coordinates.** The fetch script geocodes every shop's
+  address itself via the Census Bureau's batch geocoder, in batches of
+  1,000. This is the main reason the TX fetch takes much longer than NY's —
+  budget 20-60+ minutes for a full run, not seconds.
+- **Classification is a best-effort keyword match**, because I couldn't
+  verify every real `LICENSE TYPE` value TDLR actually uses before writing
+  this. Anything the script doesn't recognize is **not silently dropped** —
+  it's counted under "Unclassified" and listed in
+  `unclassified_license_types` in the output JSON, and the app surfaces a
+  banner if that bucket is non-empty. If you see that banner with real
+  data, take a look at the listed type strings and let me know — the
+  `classify()` function in `scripts/fetch_data.py` is where to fix it.
 
 ## 1. Run the data fetch
 
-No signup required this time. Go to **Actions → Update NY shop data → Run
-workflow**. This runs `scripts/fetch_data.py`, which pages through the full
-NY registry and overwrites `data/ny_shops.json` with real shop records
-(name, address, city, category, lat/lon), then commits it.
+No signup required. Go to **Actions → Update TX shop data → Run workflow**.
+This runs `scripts/fetch_data.py`, which:
+1. Pulls all TDLR license records matching "shop," "salon," or
+   "establishment" in the license type (filtering out unrelated trades TDLR
+   also regulates, like electricians)
+2. Classifies each into Barber / Salon / Full-Service-or-Dual /
+   Unclassified, excluding schools and instructor licenses entirely
+3. Geocodes every shop's address via the Census Bureau
+4. Writes `data/tx_shops.json` and commits it
 
-It's also scheduled to re-run automatically every Monday, since this is a
-live license registry rather than an annual survey — adjust the `cron` line
-in `.github/workflows/update-data.yml` if you want a different cadence.
+It's scheduled to re-run every Monday — adjust the `cron` line in
+`.github/workflows/update-data.yml` if you want a different cadence, and
+note the workflow has a 90-minute timeout to give the geocoding step room.
 
 You can also run it locally:
 
 ```bash
+pip install -r requirements.txt
 python3 scripts/fetch_data.py
 ```
-
-If you ever hit rate limits, get a free Socrata "app token" at
-https://data.ny.gov/profile/edit/developer_settings and add it as a repo
-secret named `NY_APP_TOKEN` — the workflow already looks for it, so no other
-changes are needed.
 
 ## 2. Turn on GitHub Pages
 
 **Settings → Pages → Build and deployment → Source: Deploy from a branch →
 Branch: `main`, folder: `/ (root)`**
 
-Your site will be live at `https://<your-username>.github.io/<repo-name>/`
-within a minute or two.
-
 ## How it's put together
 
 ```
 index.html          the page
-css/style.css        styling (shares the Boulevard brand tokens with the Census app)
+css/style.css        styling (shares Boulevard brand tokens with the other two apps)
 js/app.js             search, rollup table, ranking chart, and the Leaflet map
-data/ny_shops.json    the dataset the page reads (static JSON, no server needed)
-scripts/fetch_data.py pulls fresh data from data.ny.gov
+data/tx_shops.json    the dataset the page reads (static JSON, no server needed)
+scripts/fetch_data.py pulls + classifies + geocodes fresh data
+requirements.txt      just `requests`, needed for the geocoder's file upload
 .github/workflows/    scheduled + on-demand data refresh
 ```
 
-The map uses [Leaflet](https://leafletjs.com/) with the
-[marker clustering plugin](https://github.com/Leaflet/Leaflet.markercluster),
-loaded from a CDN — both are free, open-source, and need no API key
-(unlike Google Maps).
-
 ### Data notes
 
-- **"Shops" = business-level licenses only** (`DOSAEBUSINESS` and
-  `DOSBARSHOPOWNER` license types) — not individual practitioner licenses,
-  and not Area Renters. Area Renters are independent contractors who rent a
-  chair/space inside someone else's already-counted shop, so including them
-  as separate "shops" would double-count locations. The fetch script tracks
-  how many Area Renter (and any other) records it excluded — see
-  `excluded_area_renter_records` in the output JSON.
-- NY's registry doesn't split appearance enhancement businesses into
-  "beauty salon" vs. "nail salon" vs. "esthetics" the way Census NAICS
-  codes do — a single Appearance Enhancement Business license can cover any
-  combination of cosmetology, esthetics, nail specialty, natural hair
-  styling, and waxing services. If you want a finer breakdown, the separate
-  *individual practitioner* license dataset
-  (https://data.ny.gov/Economic-Development/Active-Appearance-Enhancement-and-Barber-Individua/ucu3-8265)
-  does break down by discipline, but it's licensee counts, not shop counts.
-- City rollups are based on the `business_city` field as entered by each
-  licensee, so minor spelling/casing variants (e.g., "New York" vs "NY,
-  NY") could split a city into more than one row. Worth spot-checking if a
-  city's numbers look surprisingly low.
+- "Shops" here means business-level establishment licenses, not individual
+  practitioner licenses (Cosmetologist, Barber, Operator, Manicurist,
+  Esthetician, etc.) and not schools — those are excluded from the count
+  entirely, same principle as the NY app excluding Area Renters.
+- Map coverage will be less than 100% — some addresses won't geocode
+  cleanly (PO boxes, incomplete addresses, typos in the source data). The
+  footer shows exactly what fraction mapped successfully. Ungeocoded shops
+  still count in the totals and table; they just won't show a pin.
+- County names come directly from TDLR's own `BUSINESS COUNTY` field, so
+  they should be clean and consistent (no city-spelling-variant issue like
+  NY's city-based rollup had).
 
 ## Customizing
 
-- **Add individual practitioner data:** point a second fetch at the
-  `ucu3-8265` resource and merge it in.
-- **Change map defaults:** initial center/zoom is set in `buildMap()` in
-  `js/app.js`.
+- **Refine the category mapping:** edit `classify()` in
+  `scripts/fetch_data.py`. If the `unclassified_license_types` banner shows
+  up with real data, this is the first place to look.
+- **Geocoding speed/batch size:** `GEOCODE_BATCH_SIZE` and
+  `GEOCODE_PAUSE_SECONDS` in `scripts/fetch_data.py`.
 - **Colors/fonts:** all in the `:root` block at the top of `css/style.css` —
-  currently Boulevard's brand system, same as the Census app.
+  Boulevard's brand system, same as the other two apps.

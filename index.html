@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NY Shop Directory — Barbershops &amp; Appearance Enhancement Businesses</title>
+<meta name="description" content="A live directory of licensed barbershops and appearance enhancement businesses in New York State, from the NYS Department of State open data registry." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Wix+Madefor+Display:wght@400;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <div class="logo-lockup">BOULEVARD</div>
+    <span class="eyebrow">New York State Dept. of State · Open Data (data.ny.gov)</span>
+    <h1 class="wordmark">NY Shop <span class="accent">Directory</span></h1>
+    <p class="tagline">Every active licensed barbershop and appearance enhancement business in New York State, straight from the state registry.</p>
+  </div>
+</header>
+
+<div id="sample-banner" class="sample-banner" hidden>
+  <div class="wrap">
+    <strong>Sample data.</strong>
+    <span>This is placeholder data, not the real NY registry. Run the <code>update-data</code> GitHub Action to pull live figures — no API key required.</span>
+  </div>
+</div>
+
+<main class="wrap">
+
+  <section class="finder" aria-label="Find a city">
+    <label for="city-search" class="finder-label">Look up a city</label>
+    <div class="finder-row">
+      <input id="city-search" type="text" list="city-list" placeholder="Start typing a city, e.g. Rochester" autocomplete="off" />
+      <datalist id="city-list"></datalist>
+    </div>
+    <p class="finder-hint" id="finder-hint">Showing statewide totals until you pick a city.</p>
+  </section>
+
+  <section id="summary" class="detail" aria-live="polite">
+    <!-- populated by js/app.js -->
+  </section>
+
+  <section class="rank-section">
+    <div class="rank-head">
+      <h2 id="rank-title">Top cities by total shops</h2>
+      <p class="muted" id="rank-sub">Barbershops + appearance enhancement businesses combined. Pick a city above to highlight it.</p>
+    </div>
+    <div id="rank-chart" class="rank-chart"></div>
+  </section>
+
+  <section class="map-section">
+    <div class="table-head">
+      <h2>Map</h2>
+      <p class="muted">Zoom and pan freely, or search a city above to fly there. Pins cluster automatically when zoomed out.</p>
+    </div>
+    <div id="map" class="map"></div>
+  </section>
+
+  <section class="table-section">
+    <div class="table-head">
+      <h2>Browse all cities</h2>
+      <p class="muted">Filtering follows the search box above.</p>
+    </div>
+    <div class="table-scroll">
+      <table id="data-table">
+        <thead>
+          <tr>
+            <th scope="col">City</th>
+            <th scope="col">Barbershops</th>
+            <th scope="col">Appearance enhancement<br /><span class="th-sub">salons, nail, esthetics, etc.</span></th>
+            <th scope="col">Total shops</th>
+          </tr>
+        </thead>
+        <tbody id="data-table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p>
+      Source: <span id="source-label">New York State Department of State via data.ny.gov</span> ·
+      Last updated <span id="updated-label">—</span>
+    </p>
+    <p class="muted">"Barbershops" and "Appearance enhancement businesses" are active business-level licenses (owner or business licensees), not individual practitioner licenses. Independent contractors renting space in someone else's shop ("Area Renters") are excluded from shop counts to avoid double-counting locations.</p>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

@@ -11,7 +11,7 @@ permissions:
 jobs:
   update-data:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 300  # geocoding is genuinely slow; this is just a safety ceiling
     steps:
       - uses: actions/checkout@v4
 
@@ -22,13 +22,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Fetch and geocode TX shop data
-        run: python scripts/fetch_data.py
-
-      - name: Commit updated data
+      - name: Configure git for checkpoint commits
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/tx_shops.json
-          git diff --quiet --cached || git commit -m "Update TX shop data"
-          git push
+
+      - name: Fetch and geocode TX shop data
+        run: python scripts/fetch_data.py
